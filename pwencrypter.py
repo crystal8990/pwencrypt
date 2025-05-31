@@ -381,24 +381,53 @@ def details_vault_menu(vault, username, key):
         else:
             print("Invalid option. Please try again.")
 
+def delete_user_data(vault, username):
+    """Deletes all data for the logged-in user after confirmation."""
+    print(f"\n⚠ WARNING: You are about to delete all vault data for {username}.")
+    confirm = input("Type 'DELETE' to confirm, or press Enter to cancel: ")
+
+    if confirm.strip().upper() == "DELETE":
+        del vault[username]  # Remove user's entire profile from the vault
+        save_vault(vault)
+        print(f"✅ All data for {username} has been permanently deleted.")
+        return None  # Log out the user after deletion
+    else:
+        print("❌ Deletion cancelled. Your data remains intact.")
+        return username  # User continues to have access
+
 def main_menu():
     user_data = login()
     if not user_data:
         return
+
     username, key, vault = user_data
+
     while True:
         print("\n========= Secure Vault Main Menu =========")
         print("1. Password Vault")
         print("2. Details Vault")
         print("3. Logout")
+        print("4. Tutorial")
+        print("5. Delete My Vault Data")  # New menu option
+
         choice = input("Select an option: ")
+
         if choice == "1":
             password_vault_menu(vault, username, key)
+
         elif choice == "2":
             details_vault_menu(vault, username, key)
+
         elif choice == "3":
             print("🔒 Vault Locked. Goodbye!")
             break
+        elif choice == "4":
+            print("y = yes n = no. This system utilises AES256 encryption which is hack-proof from the outside. The recovery code is 1610 for now")
+                  
+        elif choice == "5":
+            username = delete_user_data(vault, username)
+            if username is None:
+                return  # Exit to prevent further actions after data deletion
         else:
             print("Invalid option. Please try again.")
 
