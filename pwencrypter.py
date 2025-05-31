@@ -6,6 +6,9 @@ from cryptography.fernet import Fernet
 from getpass import getpass
 
 VAULT_FILE = "vault_data.json"
+RECOVERY_CODE = "1610"
+
+
 
 # Ensure the vault file exists
 if not os.path.exists(VAULT_FILE):
@@ -48,19 +51,25 @@ def login():
     attempts = 3
     while attempts > 0:
         password = getpass("Enter Vault Password: ")
+
         # Check if recovery code is entered
-        if password == "1610":
-            print("Recovery Code Entered! 🔒 Resetting vault access...")
-            return reset_password(username)
+        if password == RECOVERY_CODE:
+            print("Recovery Code Entered! 🔒 Retrieving vault access...")
+            vault_key = decrypt_vault_key_with_recovery(vault[username]["recovery_vault_key"])
+            print(f"Vault access restored via recovery code.")
+            return username, vault_key, vault
+
+        # Validate password and decrypt vault key
         if vault[username]["password"] == password:
-            key = generate_key(password)
+            vault_key = decrypt_vault_key(vault[username]["vault_key"], password)
             print(f"Welcome, {username}! 🔐 Vault Unlocked.")
-            return username, key, vault
+            return username, vault_key, vault
+
         attempts -= 1
         print(f"Incorrect password! {attempts} attempt(s) remaining.")
 
     print("Too many failed attempts.")
-    if input("Enter recovery code (1610) to reset your password: ") == "1610":
+    if input("Enter recovery code to reset your password: ") == RECOVERY_CODE:
         return reset_password(username)
     else:
         print("Access denied.")
@@ -71,7 +80,23 @@ def create_profile():
     username = input("Create a username: ")
     password = getpass("Set your vault password: ")
     vault = load_vault()
-    vault[username] = {"password": password, "passwords": {}, "details": {}}
+
+    # Generate new vault key
+    vault_key = generate_vault_key()
+
+    # Encrypt vault key using master password & recovery code
+    encrypted_vault_key = encrypt_vault_key(vault_key, password)
+    encrypted_vault_key_recovery = encrypt_vault_key_with_recovery(vault_key)
+
+    # Store user profile with encrypted vault key
+    vault[username] = {
+        "password": password,
+        "vault_key": encrypted_vault_key,
+        "recovery_vault_key": encrypted_vault_key_recovery,
+        "passwords": {},
+        "details": {}
+    }
+
     save_vault(vault)
     print("✅ Profile created successfully!")
     return username, generate_key(password), vault
@@ -82,11 +107,72 @@ def reset_password(username):
     if username not in vault:
         print("❌ No profile found for recovery.")
         return None
+
+    # Retrieve current vault key using old password before resetting
+    old_password = vault[username]["password"]
+    vault_key = decrypt_vault_key(vault[username]["vault_key"], old_password)
+
+    # Set new vault password
     new_password = getpass("Set a new vault password: ")
     vault[username]["password"] = new_password
+
+    # Re-encrypt vault key with new password & recovery code
+    new_encrypted_vault_key, new_encrypted_recovery_vault_key = update_vault_key_encryption(vault_key, new_password)
+    vault[username]["vault_key"] = new_encrypted_vault_key
+    vault[username]["recovery_vault_key"] = new_encrypted_recovery_vault_key
+
     save_vault(vault)
     print("🔑 Vault successfully re-encrypted with new password.")
-    return username, generate_key(new_password), vault
+    return username, vault_key, vault
+
+import base64
+from cryptography.fernet import Fernet
+
+def generate_vault_key():
+    return Fernet.generate_key()
+
+import base64
+from cryptography.fernet import Fernet
+
+def encrypt_vault_key(vault_key, master_password):
+    master_key = base64.urlsafe_b64encode(master_password.encode().ljust(32)[:32])
+    cipher = Fernet(master_key)
+
+    # Ensure vault_key is properly formatted as bytes before encryption
+    return cipher.encrypt(vault_key.encode()).decode() if isinstance(vault_key, str) else cipher.encrypt(vault_key).decode()
+
+import base64
+from cryptography.fernet import Fernet
+
+def encrypt_vault_key_with_recovery(vault_key):
+    recovery_key = base64.urlsafe_b64encode("1610".encode().ljust(32)[:32])
+    cipher = Fernet(recovery_key)
+
+    # Convert vault_key to bytes before encryption
+    return cipher.encrypt(vault_key.encode() if isinstance(vault_key, str) else vault_key).decode()
+
+def decrypt_vault_key_with_recovery(encrypted_vault_key):
+    recovery_key = base64.urlsafe_b64encode("1610".encode().ljust(32)[:32])
+    cipher = Fernet(recovery_key)
+
+    # Ensure decrypted output is a string
+    return cipher.decrypt(encrypted_vault_key.encode()).decode()
+
+import base64
+from cryptography.fernet import Fernet
+
+def decrypt_vault_key(encrypted_vault_key, master_password):
+    master_key = base64.urlsafe_b64encode(master_password.encode().ljust(32)[:32])
+    cipher = Fernet(master_key)
+
+    # Ensure decryption converts bytes back into a string format
+    return cipher.decrypt(encrypted_vault_key.encode()).decode()
+
+def update_vault_key_encryption(vault_key, new_master_password):
+    encrypted_key_with_new_password = encrypt_vault_key(vault_key, new_master_password)
+    encrypted_key_with_recovery = encrypt_vault_key_with_recovery(vault_key)
+
+    return encrypted_key_with_new_password, encrypted_key_with_recovery
 
 #--------------------------------------------------
 # Password Vault Functions
