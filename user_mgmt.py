@@ -54,16 +54,17 @@ def create_account(vault: dict) -> None:
     
     # Store primary and secondary wrapper credentials.
     user_data = {
-        "pwd_salt": pwd_salt.hex(),        # Salt for primary (password) derivation.
-        "wrapped_key": wrapped_key,          # Primary wrapper of master key.
-        "recovery_salt": recovery_salt.hex(),# Salt for recovery code derivation.
-        "recovery_wrapper": recovery_wrapper # Recovery wrapper of master key.
+        "pwd_salt": pwd_salt.hex(),         # Salt for primary (password) derivation.
+        "wrapped_key": wrapped_key,           # Primary wrapper of master key.
+        "recovery_salt": recovery_salt.hex(), # Salt for recovery code derivation.
+        "recovery_wrapper": recovery_wrapper  # Recovery wrapper of master key.
     }
     vault.setdefault("users", {})[username] = user_data
 
     print("✅ Account created successfully.\n")
     print(f"🔑 Your permanent recovery code is: {recovery_code}")
     print("Please store this recovery code safely. It will be required for account recovery.\n")
+    input("Press Enter to continue...")  # New prompt added to allow the user time to note the recovery code.
     log_event(vault, username, "create_account", True)
 
 
