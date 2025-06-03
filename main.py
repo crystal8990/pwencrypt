@@ -9,6 +9,9 @@ from password_vault  import password_menu
 from details_vault   import details_menu
 from audit_logger    import view_logs
 
+import os
+os.system("title Secure Vault")
+
 def clear_screen():
     """Clear terminal on Windows or Unix."""
     os.system("cls" if os.name == "nt" else "clear")
