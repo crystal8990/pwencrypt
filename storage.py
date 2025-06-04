@@ -11,9 +11,24 @@ from integrity import (
     verify_data, write_signature
 )
 
-VAULT_PATH = "vault.json"
-SIG_PATH   = "vault.json.sig"
-BACKUP_DIR = "backups"
+def get_app_data_directory() -> str:
+    """
+    Returns the path to the SecureVault directory inside the user's APPDATA folder.
+    Creates the directory if it doesn't already exist.
+    """
+    appdata = os.getenv("APPDATA")
+    if not appdata:
+        # Fallback for non-Windows systems or if APPDATA is not set.
+        appdata = os.path.expanduser("~")
+    base_path = os.path.join(appdata, "SecureVault")
+    os.makedirs(base_path, exist_ok=True)
+    return base_path
+
+# Base directory for storing vault data (this should match the installer-created folder)
+BASE_DIR = get_app_data_directory()
+VAULT_PATH = os.path.join(BASE_DIR, "vault.json")
+SIG_PATH   = os.path.join(BASE_DIR, "vault.json.sig")
+BACKUP_DIR = os.path.join(BASE_DIR, "backups")
 
 
 def _ensure_backup_dir() -> None:
@@ -35,7 +50,7 @@ def _backup_files() -> None:
         shutil.copy2(SIG_PATH, os.path.join(BACKUP_DIR, f"vault-{ts}.sig"))
 
 
-def _list_backups() -> Dict[int,str]:
+def _list_backups() -> Dict[int, str]:
     """
     Return a numbered dict of available .json backups, newest first.
     """
@@ -45,7 +60,7 @@ def _list_backups() -> Dict[int,str]:
         [f for f in os.listdir(BACKUP_DIR) if f.endswith(".json")],
         reverse=True
     )
-    return {i+1: files[i] for i in range(len(files))}
+    return {i + 1: files[i] for i in range(len(files))}
 
 
 def _restore_backup() -> bool:
@@ -75,7 +90,7 @@ def _restore_backup() -> bool:
     if os.path.exists(sig_src):
         shutil.copy2(sig_src, SIG_PATH)
     else:
-        # regen missing signature
+        # Regenerate missing signature
         raw = open(VAULT_PATH, "rb").read()
         write_signature(raw)
 
